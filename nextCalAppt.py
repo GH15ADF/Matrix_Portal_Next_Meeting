@@ -38,6 +38,9 @@ ResponseStatus = ["None", "Organizer", "Tentative",
 # https://docs.microsoft.com/en-us/office/vba/api/outlook.olimportance
 Importance = ["Low", "Normal", "High"]
 
+# https://docs.microsoft.com/en-us/office/vba/api/outlook.olmeetingstatus
+MeetingStatus = ["None", "Meeting", "", "Received", "", "Canceled", "", "Received/Canceled"]
+
 # --- Logging if you want ---
 logging.basicConfig(
     format='%(asctime)s %(funcName)s - %(message)s', level=logging.INFO)
@@ -56,7 +59,7 @@ def get_outlook_appts(begin: datetime, end: datetime) -> Tuple[str, int, str]:
 
     :param datetime begin: the filter for appointments with start times after this time
     :param datetime end: the filter appointments with start times no later than this time
-    :return: tuple of subject, start time, response status
+    :return: tuple of subject, start time, response status, meeting status
     """
     logging.debug("begin: %s end: %s", begin, end)
 
@@ -75,8 +78,8 @@ def get_outlook_appts(begin: datetime, end: datetime) -> Tuple[str, int, str]:
     calendar = calendar.Restrict(restriction)
 
     for item in calendar:
-        logging.debug("Appt--> %s %s %s %s", item.start, item.subject,
-                      ResponseStatus[item.responseStatus], Importance[item.Importance])
+        logging.debug("Appt--> %s|%s|%s|%s|%s", item.start, item.subject,
+                      ResponseStatus[item.responseStatus], Importance[item.Importance], MeetingStatus[item.MeetingStatus])
 
     # to detect multiple appointements at the same time, filter again
     restriction = "[Start] = '" + \
@@ -88,8 +91,8 @@ def get_outlook_appts(begin: datetime, end: datetime) -> Tuple[str, int, str]:
     event_count = 0
     for item in calendar:
         event_count += 1
-        logging.debug("top appt(s)--> %s %s %s %s", item.start, item.subject,
-                      ResponseStatus[item.responseStatus], Importance[item.Importance])
+        logging.debug("top appt(s)--> %s %s %s %s %s", item.start, item.subject,
+                      ResponseStatus[item.responseStatus], Importance[item.Importance], MeetingStatus[item.MeetingStatus])
 
     logging.debug("Appts list size %d", event_count)
 
@@ -97,16 +100,19 @@ def get_outlook_appts(begin: datetime, end: datetime) -> Tuple[str, int, str]:
         subject = MULTIPLE_APPTS_STR
         start = int(calendar[0].start.timestamp())
         response_status = "None"
+        meeting_status = "None"
     elif event_count == 1:
         subject = calendar[0].subject
         start = int(calendar[0].start.timestamp())
         response_status = ResponseStatus[calendar[0].responseStatus]
+        meeting_status = MeetingStatus[calendar[0].MeetingStatus]
     else:  # handle nothing in Outlook to return at this point
         subject = "None"
         start = ""
         response_status = ""
+        meeting_status = ""
 
-    return subject, start, response_status
+    return subject, start, response_status, meeting_status
 
 
 def send_to_aio(key: str, data: str) -> None:
@@ -137,13 +143,15 @@ def main():
         now + dt.timedelta(days=DAYS_AHEAD), "%Y-%m-%d %I:%M %p"))
 
     # get the next appointment
-    subject, start_time, resp_stat = get_outlook_appts(\
+    subject, start_time, resp_stat, meeting_status = get_outlook_appts(\
         dt.datetime.now() - dt.timedelta(minutes=MINUTES_BACK), \
         dt.datetime.now() + dt.timedelta(days=DAYS_AHEAD))
 
     # strip the subject in case a subject has trailing spaces
     curr_latest = {"start": start_time,
-                   "subject": subject.strip(), "responseStatus": resp_stat}
+                   "subject": subject.strip(), 
+                   "responseStatus": resp_stat,
+                   "meeting_status" : meeting_status}
     upload = json.dumps(curr_latest)
     logging.debug("JSON to AIO: %s", upload)
 

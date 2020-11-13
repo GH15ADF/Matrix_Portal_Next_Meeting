@@ -25,7 +25,7 @@ Installation specific configuration settings are stored in a [secrets.py](./secr
 
 The PC client Python3 script (nextCalAppt.py) accesses the local Microsoft Outlook application using the [pywin32](https://pypi.org/project/pywin32/) library which provides access to the Outlook client application via Windows COM. The implementation was insired by [Python in Office](https://pythoninoffice.com/get-outlook-calendar-meeting-data-using-python/). Many of the details of working with the Outlook COM API were worked out and include in the **Python in Office** article. The script can be kicked off in a command window or with a batch script and will run until killed.
 
-This script pulls a filtered view of appointments from Outlook, looks to see if there are more than one lastest appointments, and sends the start time (as Unix time), subject, and the response status to AIO as a JSON string.
+This script pulls a filtered view of appointments from Outlook, looks to see if there are more than one lastest appointments, and sends the `Start` time (as Unix time), `Subject`, `Response Status`, and the `Meeting Status` to AIO as a JSON string. The usefulness of the `Response Status` and `Meeting Status` are to allow informational display on the Matrix Portal display.
 
 ### Configuration
 
@@ -60,7 +60,7 @@ If there are no meetings to be displayed, a message is visible on the middle lin
 # Potential Improvements
 
 * Don't use the MINUTES_BACK method since it does not handle closly scheduled meetings well.
-    * Add some visual indication (icon) that the "in progress" appointment is overlapping with the next appointment
+* Add some visual indication (icon) that the "in progress" appointment is overlapping with the next appointment
 * Handle Cancelled meetings that have not been removed from the calendar. In Outlook when the meeting Organizer sends a cancellation but you have not accepted the cancellation and removed it from your calendar, the Subject has "Cancelled" prepended. It would be helpful to have an option to look for this condition and process the appointment list somewhat differently.
 * The current icons in the status bar are not very intuative and the colors are not very pleasing. There is some complications with displaying all the 16 bit colors (see [comment at line 17 in simple_scroller.py)](https://github.com/adafruit/Adafruit_Learning_System_Guides/blob/master/CircuitPython_RGBMatrix/simple_scroller.py)). Consequently, the display in the image editor (e.g., GIMP) is not exactly what you see on the RGB LED display.
 * There are buttons on the Matrix Portal which might be useful to display additional appointments or information.
