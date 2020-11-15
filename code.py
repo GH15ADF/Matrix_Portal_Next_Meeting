@@ -1,12 +1,13 @@
 """
 Display your next meeting's information on a Matrix Portal
 """
-
+from constants import time_display_colors
 from adafruit_matrixportal.matrixportal import MatrixPortal
 from adafruit_matrixportal.network import Network
 import board
 import json
 import time
+import simdata
 
 # Display imports
 import adafruit_display_text.label
@@ -32,14 +33,9 @@ DEBUG = True
 """
 Use these setting to simulate AIO responses locally debug the display look and feel
 """
-USE_SIM_DATA = False
-# SIM_DATA_TIME = ">1 day"
-# SIM_DATA_TIME = ">1hr <1day"
-# SIM_DATA_TIME = "alert"
-# SIM_DATA_TIME = "warning"
-# SIM_DATA_TIME = "<1hr >warning"
-SIM_DATA_TIME = "in progress"
-SIM_DATA = '{"start":1604790000, "subject":"simulated test", "responseStatus":"Organizer"}'
+sim = simdata.sim()
+
+USE_SIM_DATA = True
 # -------------------------------
 
 # setup for Response status
@@ -48,28 +44,41 @@ SIM_DATA = '{"start":1604790000, "subject":"simulated test", "responseStatus":"O
 # https://icon-library.net/icon/icon-pixels-6.html
 # in GIMP export to BMP after chaning Image mode to Indexed and Generate Optimum pallet
 # choose advanced options and "16 bits A1 R5 G5 B5"
-ResponseStatus = {"None": {"icon": "images/NR.bmp", "color": 0x444444},
-                  "Organizer": {"icon": "images/exclaimation3.bmp", "color": 0xFCFC3F},
-                  "Tentative": {"icon": "images/question.bmp", "color": 0x273077},
-                  "Accepted": {"icon": "images/check.bmp", "color": 0x2f7727},
-                  "Declined": {"icon": "images/X.bmp", "color": 0x684b2c},
-                  "Not Responded": {"icon": "images/no-resp.bmp", "color": 0x888888},
-                  "No meeting": {"icon": "", "color": 0x000000}}
-
-# define color library for time display
-time_display_colors = {
-    "gt 1day": {"color": 0x154411, "trigger": 86400},
-    "gt 1hr":  {"color": 0x33932A, "trigger": 86400},
-    "normal":  {"color": 0x3b7a35, "trigger": 3600},  # 60 min
-    "warning": {"color": 0xFCFC3F, "trigger": 600},  # 10 min
-    "alert":   {"color": 0xCC0000, "trigger": 300},  # 5 min
-    "in progress":   {"color": 0x0000FF, "trigger": 0},
-    "No meeting":   {"color": 0x035400, "trigger": 0}
-}
+'''
+Response Status	    Description
+-----------------------------------------------------------------
+Accepted	        Sombody elses meeting you have accepted
+Canceled            Sombody elses meeting but is now canceled
+None        	    Your meeting but no attendees
+Not Responded	    Sombody elses meeting and you have not responded
+Organizer   	    Your meeting with attendees
+Tentative    	    Sombody elses meeting you  accepted as tentative
+'''
+ResponseStatus = {
+                    "Accepted": {       "icon": "images/check.bmp",         "color": 0x2f7727, "text" : "Accepted"},
+                    "Canceled": {       "icon": "images/X.bmp",             "color": 0xFF4b2c, "text" : "Canceled"},
+                    "None": {           "icon": "images/NR.bmp",            "color": 0x444444, "text" : ""},
+                    "Not Responded": {  "icon": "images/no-resp.bmp",       "color": 0x888888, "text" : "NR"},
+                    "Organizer": {      "icon": "images/exclaimation.bmp",  "color": 0xFCFC3F, "text" : "Organizer"},
+                    "Tentative": {      "icon": "images/question.bmp",      "color": 0x273077, "text" : "Tentative"},
+                    "No meeting": {     "icon": "",                         "color": 0x000000, "text" : ""}
+                }
 
 # --- Display setup ---
 matrixportal = MatrixPortal(
     bit_depth=3, status_neopixel=board.NEOPIXEL, debug=DEBUG)
+
+def get_status_vals(resp_status: str, meeting_status: str) -> dict:
+    """Compute the status row values for icon and message.
+    :param str resp_status: the reponse status value for the appointment
+    :param str meeting_status: the meeting status for the meeting
+    Returns the status line icon, text and text color as a dict
+    """
+    # if the meeting status is canceled, ignore the response status
+    if meeting_status.lower.find("cancelled") >= -1:
+        return(ResponseStatus["Canceled"])
+    else:
+        return(ResponseStatus[resp_status])
 
 
 def get_count_down(start: str, resp_status: str) -> tuple(str, int):
@@ -147,16 +156,15 @@ def main():
         # text_font="fonts/6x10.bdf",
         # text_font="fonts/Dogica_Pixel-8-8.bdf",
         text_font="fonts/Minecraftia-Regular-8.bdf",
-        # text_color=0xEF7F31,
         text_color=0x262022,
-        text_position=(0, (matrixportal.graphics.display.height // 2 + 4)),
+        text_position=(0, 21)
     )
 
     # Create a new textbox 2 response status
     matrixportal.add_text(
-        text_font=terminalio.FONT,
-        text_position=(
-            12, (2 * matrixportal.graphics.display.height // 3) + 3),
+        text_font="fonts/Minecraftia-Regular-8.bdf",
+        # text_font=terminalio.FONT,
+        text_position=(12, 31)
     )
 
     # Create a new textbox 3 for non-scrolling Subject
@@ -193,31 +201,9 @@ def main():
         # for testing
         if USE_SIM_DATA:
             print("Simulating data")
-            appt_data = json.loads(SIM_DATA)
-            sim_test_time = time.time()
-
-            if SIM_DATA_TIME == ">1 day":
-                sim_start_time = sim_test_time + (24 + 1)*60*60
-
-            if SIM_DATA_TIME == ">1hr <1day":
-                sim_start_time = sim_test_time + 12*60*60
-
-            if SIM_DATA_TIME == "alert":
-                sim_start_time = sim_test_time + \
-                    time_display_colors["alert"]["trigger"]
-
-            if SIM_DATA_TIME == "warning":
-                sim_start_time = sim_test_time + \
-                    time_display_colors["warning"]["trigger"]
-
-            if SIM_DATA_TIME == "<1hr >warning":
-                sim_start_time = sim_test_time + \
-                    time_display_colors["warning"]["trigger"] + 10*60
-
-            if SIM_DATA_TIME == "in progress":
-                sim_start_time = sim_test_time
-
-            appt_data["start"] = sim_start_time
+            POLL_SECS = 5 # shorten the poll time to make the test go quicker
+            appt_data = sim.get_sim_data()
+            print("simulated app data: ", appt_data)
 
         # Typical path to get the latet appointment from AIO
         else:
@@ -253,10 +239,10 @@ def main():
                 print("appt_data[\"start\"]", int(appt_data["start"]))
 
         if len(appt_data["subject"]) > SUBJECT_SCROLL_LIMIT:
-            matrixportal.set_text(appt_data["subject"], 0)
+            matrixportal.set_text(appt_data["subject"].strip(), 0)
             matrixportal.set_text("", 3)
         else:
-            matrixportal.set_text(appt_data["subject"], 3)
+            matrixportal.set_text(appt_data["subject"].strip(), 3)
             matrixportal.set_text(" ", 0)
 
         # Set Response status text and icon
