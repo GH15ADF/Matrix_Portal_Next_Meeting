@@ -54,13 +54,13 @@ Not Responded	    Sombody elses meeting and you have not responded
 Organizer   	    Your meeting with attendees
 Tentative    	    Sombody elses meeting you  accepted as tentative
 '''
-ResponseStatus = {
+status_msg = {
                     "Accepted": {       "icon": "images/check.bmp",         "color": 0x2f7727, "text" : "Accepted"},
                     "Canceled": {       "icon": "images/X.bmp",             "color": 0xFF4b2c, "text" : "Canceled"},
                     "None": {           "icon": "images/NR.bmp",            "color": 0x444444, "text" : ""},
                     "Not Responded": {  "icon": "images/no-resp.bmp",       "color": 0x888888, "text" : "NR"},
                     "Organizer": {      "icon": "images/exclaimation.bmp",  "color": 0xFCFC3F, "text" : "Organizer"},
-                    "Tentative": {      "icon": "images/question.bmp",      "color": 0x273077, "text" : "Tentative"},
+                    "Tentative": {      "icon": "images/question_mark.bmp",      "color": 0x273077, "text" : "Tentative"},
                     "No meeting": {     "icon": "",                         "color": 0x000000, "text" : ""}
                 }
 
@@ -68,17 +68,17 @@ ResponseStatus = {
 matrixportal = MatrixPortal(
     bit_depth=3, status_neopixel=board.NEOPIXEL, debug=DEBUG)
 
-def get_status_vals(resp_status: str, meeting_status: str) -> dict:
+def compute_status(resp_status: str, meeting_status: str) -> str:
     """Compute the status row values for icon and message.
     :param str resp_status: the reponse status value for the appointment
     :param str meeting_status: the meeting status for the meeting
     Returns the status line icon, text and text color as a dict
     """
     # if the meeting status is canceled, ignore the response status
-    if meeting_status.lower.find("cancelled") >= -1:
-        return(ResponseStatus["Canceled"])
+    if meeting_status.lower().find("canceled") > -1:
+        return("Canceled")
     else:
-        return(ResponseStatus[resp_status])
+        return(resp_status)
 
 
 def get_count_down(start: str, resp_status: str) -> tuple(str, int):
@@ -202,7 +202,7 @@ def main():
         if USE_SIM_DATA:
             print("Simulating data")
             POLL_SECS = 5 # shorten the poll time to make the test go quicker
-            appt_data = sim.get_sim_data()
+            appt_data = sim.get_sim_data(meet_stat="Canceled", subject="mee too", resp_stat="Organizer", ttime="alert")
             print("simulated app data: ", appt_data)
 
         # Typical path to get the latet appointment from AIO
@@ -246,11 +246,12 @@ def main():
             matrixportal.set_text(" ", 0)
 
         # Set Response status text and icon
-        matrixportal.set_text(appt_data["responseStatus"], 2)
+        status_display = compute_status(appt_data["responseStatus"],appt_data["meeting_status"])
+        matrixportal.set_text(status_msg[status_display]["text"], 2)
         matrixportal.set_text_color(
-            ResponseStatus[appt_data["responseStatus"]]["color"], 2)
+            status_msg[status_display]["color"], 2)
         matrixportal.set_background(
-            ResponseStatus[appt_data["responseStatus"]]["icon"], [0, 21])
+            status_msg[status_display]["icon"], [0, 21])
 
         # to set up for the re-poll time, get the last update time
         last = time.time()
