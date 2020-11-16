@@ -77,35 +77,42 @@ def get_outlook_appts(begin: datetime, end: datetime) -> Tuple[str, int, str]:
     logging.debug("Initial restriction: %s", restriction)
     calendar = calendar.Restrict(restriction)
 
+    # for debugging
     for item in calendar:
         logging.debug("Appt--> %s|%s|%s|%s|%s", item.start, item.subject,
                       ResponseStatus[item.responseStatus], Importance[item.Importance], MeetingStatus[item.MeetingStatus])
 
     # to detect multiple appointements at the same time, filter again
+    # assume calendar[0] has the earliest start time to filter on
     restriction = "[Start] = '" + \
         calendar[0].start.strftime('%m/%d/%Y %I:%M %p') + "'"
     logging.debug("Multiple appts restriction: %s", restriction)
     calendar = calendar.Restrict(restriction)
 
-    # get the count of items in the list. Can't figure out how to ask the OLE object
-    event_count = 0
+    # It appears that you need to load calendar appointments COM Object into a list since the 
+    # calendar object does not seem to behave like a real list
+    # load what's left into a list
+    cal_items = []
     for item in calendar:
-        event_count += 1
-        logging.debug("top appt(s)--> %s %s %s %s %s", item.start, item.subject,
-                      ResponseStatus[item.responseStatus], Importance[item.Importance], MeetingStatus[item.MeetingStatus])
+        cal_items.append({
+            "start":item.start, 
+            "subject": item.subject, 
+            "resp_stat":ResponseStatus[item.responseStatus],
+            "importance":Importance[item.Importance],
+            "meeting_status":MeetingStatus[item.MeetingStatus]})
+    appt_count = len(cal_items)
+    logging.debug("Appts list size %d", appt_count)
 
-    logging.debug("Appts list size %d", event_count)
-
-    if event_count > 1:
+    if appt_count > 1:
         subject = MULTIPLE_APPTS_STR
-        start = int(calendar[0].start.timestamp())
+        start = int(cal_items[0]["start"].timestamp())
         response_status = "None"
         meeting_status = "None"
-    elif event_count == 1:
-        subject = calendar[0].subject
-        start = int(calendar[0].start.timestamp())
-        response_status = ResponseStatus[calendar[0].responseStatus]
-        meeting_status = MeetingStatus[calendar[0].MeetingStatus]
+    elif appt_count == 1:
+        subject = cal_items[0]["subject"]
+        start = int(cal_items[0]["start"].timestamp())
+        response_status = cal_items[0]["resp_stat"]
+        meeting_status = cal_items[0]["meeting_status"]
     else:  # handle nothing in Outlook to return at this point
         subject = "None"
         start = ""
