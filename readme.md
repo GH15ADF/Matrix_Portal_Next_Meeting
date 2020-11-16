@@ -25,7 +25,20 @@ Installation specific configuration settings are stored in a [secrets.py](./secr
 
 The PC client Python3 script (nextCalAppt.py) accesses the local Microsoft Outlook application using the [pywin32](https://pypi.org/project/pywin32/) library which provides access to the Outlook client application via Windows COM. The implementation was insired by [Python in Office](https://pythoninoffice.com/get-outlook-calendar-meeting-data-using-python/). Many of the details of working with the Outlook COM API were worked out and include in the **Python in Office** article. The script can be kicked off in a command window or with a batch script and will run until killed.
 
-This script pulls a filtered view of appointments from Outlook, looks to see if there are more than one lastest appointments, and sends the `Start` time (as Unix time), `Subject`, `Response Status`, and the `Meeting Status` to AIO as a JSON string. The usefulness of the `Response Status` and `Meeting Status` are to allow informational display on the Matrix Portal display.
+This script pulls a filtered view of appointments from Outlook, looks to see if there are more than one lastest appointments, and sends the following to AIO as a JSON string:
+
+| Name | type | Description |
+|------|------|-------|
+| start | int | Start time of the meeting  as Unix time |
+| subject | str | The Subject or title of the meeting|
+| responseStatus | str | Response Status |
+| meeting_status | str | Meeting status|
+
+Example:
+`{"start": 1605542400, "subject": "Just another meeting", "responseStatus": "Organizer", "meeting_status": "Received"}`
+
+
+Another client script would just need to follow this interface format for the Matrix Portal script to function.
 
 ### Configuration
 
@@ -40,14 +53,16 @@ The Matrix Portal Script is based on Circuit Python and the supporting libraries
 
 It is important to note that the library for accessing AIO from a Windows Python3 environment is somewhat different that the library available in CircuitPython. So the code between the two Python scripts cannot be fully shared. There are also some other limitations (e.g., no time.strftime() function) that needed to be worked around.
 
-The display is divided into a three lines:
-- Top - Scrolling area for the meeting subject
+The display is divided into five elements on three display rows:
+- Top - Scrolling area for the meeting subject (#1 in Display Example)
 - Middle - Time information
-    - Left Side - Start time displayed as HH:MM a/p (12 hour time)
-    - Right Side - Count down to the meeting start displayed as MM:SS
+    - Left Side - Start time displayed as HH:MM a/p (12 hour time)  (#2)
+    - Right Side - Count down to the meeting start displayed as MM:SS (#3)
 * Bottom - Response Status information
-    - Left - Icon
-    - Right - Response status text
+    - Left - Icon (#4)
+    - Right - Response status text (#5)
+
+![Display Example](images/MatrixPortal-Next-Meeting-display.png)
 
 If there are no meetings to be displayed, a message is visible on the middle line.
 
@@ -57,11 +72,17 @@ If there are no meetings to be displayed, a message is visible on the middle lin
 
 * SUBJECT_SCROLL_LIMIT - To make the display no so busy when the appoitment title is short, you can set how many characters will trigger scrolling of the Subject text. I suspect this is highly dependent on the font used in the The default is 10.
 
-# Potential Improvements
+# Attribution
+
+For this project I also used:
+- [Minecraft](https://www.dafont.com/minecraft.font) font by Crafton Gaming
+- [FontForge](https://fontforge.org) and [Use FontForge](https://learn.adafruit.com/custom-fonts-for-pyportal-circuitpython-display/conversion)
+
+# Future Work
 
 * Don't use the MINUTES_BACK method since it does not handle closly scheduled meetings well.
 * Add some visual indication (icon) that the "in progress" appointment is overlapping with the next appointment
-* Handle Cancelled meetings that have not been removed from the calendar. In Outlook when the meeting Organizer sends a cancellation but you have not accepted the cancellation and removed it from your calendar, the Subject has "Cancelled" prepended. It would be helpful to have an option to look for this condition and process the appointment list somewhat differently.
+* Handle Calendars other than Outlook. For example, Google Calendars or o365 Outlook.
 * The current icons in the status bar are not very intuative and the colors are not very pleasing. There is some complications with displaying all the 16 bit colors (see [comment at line 17 in simple_scroller.py)](https://github.com/adafruit/Adafruit_Learning_System_Guides/blob/master/CircuitPython_RGBMatrix/simple_scroller.py)). Consequently, the display in the image editor (e.g., GIMP) is not exactly what you see on the RGB LED display.
 * There are buttons on the Matrix Portal which might be useful to display additional appointments or information.
 * The Adafruit AirLift ESP-32 Co-processor has BLE, so adding a configuration app connectivity is plausable when CircuitPython BLE support enables that function.
