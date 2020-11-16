@@ -35,7 +35,7 @@ Use these setting to simulate AIO responses locally debug the display look and f
 """
 sim = simdata.sim()
 
-USE_SIM_DATA = True
+USE_SIM_DATA = False
 # -------------------------------
 
 # setup for Response status
@@ -141,6 +141,8 @@ def get_count_down(start: str, resp_status: str) -> tuple(str, int):
 
 
 def main():
+    # because this get changed for simulated data, declare it as global
+    global POLL_SECS
 
     # --- Set up the text areas ---
     # Create a new textbox 0 for scrolling the Subject
