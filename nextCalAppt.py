@@ -5,6 +5,7 @@ Mostly based on https://pythoninoffice.com/get-outlook-calendar-meeting-data-usi
 Outlook AppointmentItem object COM reference:
     https://docs.microsoft.com/en-us/office/vba/api/outlook.appointmentitem
 """
+from json.decoder import JSONDecodeError
 from typing import Tuple
 from Adafruit_IO import Client, RequestError
 import time
@@ -206,6 +207,9 @@ def main():
         logging.warning("No entries in AdafruitIO")
         # this happens when it is a new feed or you delete all the entries
         send_to_aio(aio_appt_feed.key, upload)
+    except JSONDecodeError as e:
+        logging.warning("JSON error from AdafruitIO")
+        logging.error("Exception: %s", e)
     except Exception as e:
         logging.error("Exception: %s", e)
         exit()
