@@ -1,13 +1,16 @@
 """
 Display your next meeting's information on a Matrix Portal
 """
+# local imports
+import simdata
 from constants import time_display_colors
+
+# libraries
 from adafruit_matrixportal.matrixportal import MatrixPortal
 from adafruit_matrixportal.network import Network
 import board
 import json
 import time
-import simdata
 
 # Display imports
 import adafruit_display_text.label
@@ -27,6 +30,7 @@ SCROLL_DELAY = 0.04
 
 # Display debug messages
 DEBUG = True
+MATRIX_DEBUG = False
 # -------------------------------
 
 # --- Simulation data ---
@@ -34,7 +38,7 @@ DEBUG = True
 Use these setting to simulate AIO responses locally debug the display look and feel
 """
 sim = simdata.sim()
-
+gappt_data = sim.get_sim_data(meet_stat="Canceled", subject="mee too", resp_stat="Accepted", ttime="alert")
 USE_SIM_DATA = False
 # -------------------------------
 
@@ -66,7 +70,7 @@ status_msg = {
 
 # --- Display setup ---
 matrixportal = MatrixPortal(
-    bit_depth=3, status_neopixel=board.NEOPIXEL, debug=DEBUG)
+    bit_depth=6, status_neopixel=board.NEOPIXEL, debug=MATRIX_DEBUG)
 
 def compute_status(resp_status: str, meeting_status: str) -> str:
     """Compute the status row values for icon and message.
@@ -131,9 +135,9 @@ def get_count_down(start: str, resp_status: str) -> tuple(str, int):
 
         if DEBUG:
             print("start: ", int(start))
-            print("start formatted:", time.localtime(start))
-            print("{lhrs:0>2}:{lmin:0>2}".format(lhrs=time.localtime(
-                start).tm_hour, lmin=time.localtime(start).tm_min))
+            # print("start formatted:", time.localtime(start))
+            # print("{lhrs:0>2}:{lmin:0>2}".format(lhrs=time.localtime(
+            #     start).tm_hour, lmin=time.localtime(start).tm_min))
             print("local time:", time.mktime(time.localtime()))
             print("count_down_val:", count_down_val)
 
@@ -143,6 +147,7 @@ def get_count_down(start: str, resp_status: str) -> tuple(str, int):
 def main():
     # because this get changed for simulated data, declare it as global
     global POLL_SECS
+    global gappt_data
 
     # --- Set up the text areas ---
     # Create a new textbox 0 for scrolling the Subject
@@ -155,8 +160,6 @@ def main():
 
     # Create a new textbox 1 time
     matrixportal.add_text(
-        # text_font="fonts/6x10.bdf",
-        # text_font="fonts/Dogica_Pixel-8-8.bdf",
         text_font="fonts/Minecraftia-Regular-8.bdf",
         text_color=0x262022,
         text_position=(0, 21)
@@ -182,11 +185,21 @@ def main():
     except ImportError:
         print('WiFi secrets are kept in secrets.py, please add them there!')
         raise
-
+    # matrixportal.set_background("images/gradient.bmp", [0, 0])
     matrixportal.set_text("Setting time...", 1)
 
+    # try doing an AIO call before getting time and avoid bug
+    # https://github.com/adafruit/Adafruit_CircuitPython_MatrixPortal/issues/51
+    before = time.monotonic()
+    matrixportal.get_io_feed(secrets['aio_feed'])
+    if DEBUG:
+        print("AIO get_io_feed response time: ", time.monotonic() - before)
+
     # Need to set the clock to local time
+    before = time.monotonic()
     matrixportal.get_local_time(location=secrets['timezone'])
+    if DEBUG:
+        print("AIO get_local_time response time: ", time.monotonic() - before)
 
     # now that we connected to the network to get the time,
     # we can display the local time
@@ -204,14 +217,18 @@ def main():
         if USE_SIM_DATA:
             print("Simulating data")
             POLL_SECS = 5 # shorten the poll time to make the test go quicker
-            appt_data = sim.get_sim_data(meet_stat="Canceled", subject="mee too", resp_stat="Organizer", ttime="alert")
+            appt_data = gappt_data
+#            appt_data = sim.get_sim_data(meet_stat="Canceled", subject="mee too", resp_stat="Accepted", ttime="alert")
             print("simulated app data: ", appt_data)
 
         # Typical path to get the latet appointment from AIO
         else:
             # check to see if the feed exists
             try:
+                before = time.monotonic()
                 ol_event_feed = matrixportal.get_io_data(secrets['aio_feed'])
+                if DEBUG:
+                    print("AIO get_io_data response time: ", time.monotonic() - before)
             except AdafruitIO_RequestError:
                 matrixportal.set_text_color(0xFF0000, 1)
                 matrixportal.set_text('Feed error', 1)
@@ -221,24 +238,28 @@ def main():
             # handle no data on AIO
             if len(ol_event_feed) == 0:
                 # set all appt_data fields for nothing to display
-                print("No meetings to display")
+                if DEBUG:
+                    print("No meetings to display")
                 appt_data = {}
                 appt_data["subject"] = ""
                 appt_data["responseStatus"] = "No meeting"
+                appt_data["meeting_status"] = ""
                 # make up a start time
                 appt_data["start"] = time.mktime(time.localtime())
 
             else:
                 first_item = ol_event_feed[0]
-                print(first_item["value"])
+                if DEBUG:
+                    print("first_item[\"value\"]", first_item["value"])
 
                 first_value = first_item["value"]
                 # appt_data = json.loads(first_value.replace("'", '"'))
                 appt_data = json.loads(first_value)
-                print("appt_data: ", appt_data)
 
-                print("appt_data[\"subject\"]:", appt_data["subject"])
-                print("appt_data[\"start\"]", int(appt_data["start"]))
+                if DEBUG:
+                    print("appt_data: ", appt_data)
+                    print("appt_data[\"subject\"]:", appt_data["subject"])
+                    print("appt_data[\"start\"]", int(appt_data["start"]))
 
         if len(appt_data["subject"]) > SUBJECT_SCROLL_LIMIT:
             matrixportal.set_text(appt_data["subject"].strip(), 0)
