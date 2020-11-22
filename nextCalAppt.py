@@ -44,7 +44,7 @@ MeetingStatus = ["None", "Meeting", "", "Received", "", "Canceled", "", "Receive
 
 # --- Logging if you want ---
 logging.basicConfig(
-    format='%(asctime)s %(funcName)s - %(message)s', level=logging.INFO)
+    format='%(asctime)s %(funcName)s - %(message)s', level=logging.DEBUG)
 
 # Connect to the AIO Feed
 aio = Client(secrets["aio_username"], secrets["aio_key"])
@@ -83,12 +83,17 @@ def get_outlook_appts(begin: datetime, end: datetime) -> Tuple[str, int, str]:
         logging.debug("Appt--> %s|%s|%s|%s|%s", item.start, item.subject,
                       ResponseStatus[item.responseStatus], Importance[item.Importance], MeetingStatus[item.MeetingStatus])
 
-    # to detect multiple appointements at the same time, filter again
-    # assume calendar[0] has the earliest start time to filter on
-    restriction = "[Start] = '" + \
-        calendar[0].start.strftime('%m/%d/%Y %I:%M %p') + "'"
-    logging.debug("Multiple appts restriction: %s", restriction)
-    calendar = calendar.Restrict(restriction)
+    # check to see if there are any appointments returned
+    try:
+        # to detect multiple appointements at the same time, filter again
+        # assume calendar[0] has the earliest start time to filter on
+        restriction = "[Start] = '" + \
+            calendar[0].start.strftime('%m/%d/%Y %I:%M %p') + "'"
+        logging.debug("Multiple appts restriction: %s", restriction)
+        calendar = calendar.Restrict(restriction)
+    except IndexError:
+        logging.debug("No appointments returned")
+
 
     # It appears that you need to load calendar appointments COM Object into a list since the 
     # calendar object does not seem to behave like a real list
