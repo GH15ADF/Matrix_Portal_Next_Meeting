@@ -4,35 +4,35 @@ My Next Appointment for Adafruit Matrix Portal
 The intent of the project is to display information from your calendar about your next appointment on the [Adafruit Matrix Portal](https://www.adafruit.com/product/4745) and an [Adafruit 64x32 RGB LED Matrix](http://www.adafruit.com/product/3826). The appointment information is pulled and through [Adafruit IO](https://io.adafruit.com) loaded by the Matrix Portal for display.
 
 # Background
-The motivation for creating this project was the my personal tendency to "snooze" reminders for upcoming appointments which routinely results in me being late joining online calls. Since it takes muliple mouse clicks to adjust the snooze time, the tendency is to accept the default (5, 0, etc. minutes before) and loose track of the up coming event. The concept is to have a continuosly updaing wallboard that displays the next appointment, some minimal information and a count down.
+The motivation for creating this project was the personal tendency to "snooze" reminders for upcoming appointments which routinely results in me being late joining online calls. Since it takes multiple mouse clicks to adjust the snooze time, the tendency is to accept the default (5, 0, etc. minutes before) and lose track of the upcoming event. The concept is to have a continuously updating wallboard that displays the next appointment, some minimal information and a count down.
 
 # High Level Design
-The approach is to have a client side Python script, where the appointment calendar is easily accessed,  running to pull the "next" appointment's information. The information is posted to an Adafruit IO feed. The Matrix Portal CircuitPython scipt will then pull the appointment information and format for display on the RGB LED Matrix. Since the target device has limited pixels for dsiplay (32x64) some compromises on the information to display are needed. Ultimatly the large size and bight colors on the RGB LED is presumed to mitigate the problem of "snzoozing" reminders provided the display is within the field of view.
+The approach is to have a client side Python script, where the appointment calendar is easily accessed, running to pull the "next" appointment's information. The information is posted to an Adafruit IO feed. The Matrix Portal CircuitPython script will then pull the appointment information and format for display on the RGB LED Matrix. Since the target device has limited pixels for display (32x64) some compromises on the information to display are needed. Ultimately the large size and bright colors on the RGB LED is presumed to mitigate the problem of "snoozing" reminders provided the display is within the field of view.
 
 ## Design Assumptions
 The Windows 10 PC Client script is written in Python3 to get appointments through a local Microsoft Outlook application. So the client needs Python3 installed. The [requirements-pc-client.txt](./requirements-pc-client.txt) file defines the required Python libraries.
 
-The user also needs an Adafruit IO account, although the free tier seems sufficent since there should only be one data point in the feed at any point in time. With respect to security while the data is on AIO, there is a Privacy setting where the Visibility Setting can be Private.
+The user also needs an Adafruit IO account, although the free tier seems sufficient since there should only be one data point in the feed at any point in time. With respect to security while the data is on AIO, there is a Privacy setting where the Visibility Setting can be Private.
 > Private means your feed will only be visible to you.
 
-The Matrix Portal need access to a wifi network through which Adafruit IO is accessible.
+The Matrix Portal needs access to a wifi network through which Adafruit IO is accessible.
 
-Installation specific configuration settings are stored in a [secrets.py](./secrets.py) file on both the client and Matrix Portal. See [Internet Connect!](https://learn.adafruit.com/adafruit-matrixportal-m4/internet-connect) for some details.
+Installation specific configuration settings are stored in a `secrets.py` file on both the PC client and Matrix Portal. Included is a example [my_secrets.py](./my_secrets.py), just remember to rename file. See [Internet Connect!](https://learn.adafruit.com/adafruit-matrixportal-m4/internet-connect) for some details.
 
 # Design Details
 
 ## PC Client Script
 
-The PC client Python3 script (nextCalAppt.py) accesses the local Microsoft Outlook application using the [pywin32](https://pypi.org/project/pywin32/) library which provides access to the Outlook client application via Windows COM. The implementation was insired by [Python in Office](https://pythoninoffice.com/get-outlook-calendar-meeting-data-using-python/). Many of the details of working with the Outlook COM API were worked out and include in the **Python in Office** article. The script can be kicked off in a command window or with a batch script and will run until killed.
+The PC client Python3 script (nextCalAppt.py) accesses the local Microsoft Outlook application using the [pywin32](https://pypi.org/project/pywin32/) library which provides access to the Outlook client application via Windows COM. The implementation was inspired by [Python in Office](https://pythoninoffice.com/get-outlook-calendar-meeting-data-using-python/). Many of the details of working with the Outlook COM API were worked out and include in the **Python in Office** article. The script can be kicked off in a command window or with a batch script and will run until killed.
 
-This script pulls a filtered view of appointments from Outlook, looks to see if there are more than one lastest appointments, and sends the following to AIO as a JSON string:
+This script pulls a filtered view of appointments from Outlook, looks to see if there are more than one latest appointment, and sends the following to AIO as a JSON string:
 
-| Name | type | Description |
-|------|------|-------|
-| start | int | Start time of the meeting  as Unix time |
-| subject | str | The Subject or title of the meeting|
-| responseStatus | str | Response Status |
-| meeting_status | str | Meeting status|
+| Name           | type | Description                             |
+|----------------|------|-----------------------------------------|
+| start          | int  | Start time of the meeting  as Unix time |
+| subject        | str  | The Subject or title of the meeting     |
+| responseStatus | str  | Response Status                         |
+| meeting_status | str  | Meeting status                          |
 
 Example:
 `{"start": 1605542400, "subject": "Just another meeting", "responseStatus": "Organizer", "meeting_status": "Received"}`
@@ -70,19 +70,23 @@ If there are no meetings to be displayed, a message is visible on the middle lin
 
 * POLL_SECS - like the Client Script is the time in seconds that the Matrix Portal will wait before reconnecting to AIO to get the latest appointment information. The default is 60.
 
-* SUBJECT_SCROLL_LIMIT - To make the display no so busy when the appoitment title is short, you can set how many characters will trigger scrolling of the Subject text. I suspect this is highly dependent on the font used in the The default is 10.
+* SUBJECT_SCROLL_LIMIT - To make the display no so busy when the appointment title is short, you can set how many characters will trigger scrolling of the Subject text. I suspect this is highly dependent on the font used. The default is 10.
+
+### Testing Simulation
+
+Added to the project is a module (simdata.py) that provides simulated responses from AIO to show the Matrix Portal display UI when certain appointment attributes are returned. This was added to primarily check the logic for displaying canceled appointments and the countdown (#3) and to check the icon display. To use simulation mode, you set the value for `USE_SIM_DATA` to `True` in (code.py). In the call to `get_sim_data` in `main()`, you can specify any of the four parameter values. If a parameter (e.g., `meeting_status`, `subject`, `resp_status`, and `ttime`) is set to `None` the simulated data will cycle through all the possible values for that parameter.
 
 # Attribution
 
 For this project I also used:
-- [Minecraft](https://www.dafont.com/minecraft.font) font by Crafton Gaming
+- [Minecraft font](https://www.dafont.com/minecraft.font) font by Crafton Gaming
 - [FontForge](https://fontforge.org) and [Use FontForge](https://learn.adafruit.com/custom-fonts-for-pyportal-circuitpython-display/conversion)
 
 # Future Work
 
-* Don't use the MINUTES_BACK method since it does not handle closly scheduled meetings well.
+* Don't use the MINUTES_BACK method since it does not handle closely scheduled meetings well.
 * Add some visual indication (icon) that the "in progress" appointment is overlapping with the next appointment
 * Handle Calendars other than Outlook. For example, Google Calendars or o365 Outlook.
-* The current icons in the status bar are not very intuative and the colors are not very pleasing. There is some complications with displaying all the 16 bit colors (see [comment at line 17 in simple_scroller.py)](https://github.com/adafruit/Adafruit_Learning_System_Guides/blob/master/CircuitPython_RGBMatrix/simple_scroller.py)). Consequently, the display in the image editor (e.g., GIMP) is not exactly what you see on the RGB LED display.
+* The current icons in the status bar are not very intuitive and the colors are not very pleasing. There is some complications with displaying all the 16 bit colors (see [comment at line 17 in simple_scroller.py)](https://github.com/adafruit/Adafruit_Learning_System_Guides/blob/master/CircuitPython_RGBMatrix/simple_scroller.py)). Consequently, the display in the image editor (e.g., GIMP) is not exactly what you see on the RGB LED display.
 * There are buttons on the Matrix Portal which might be useful to display additional appointments or information.
-* The Adafruit AirLift ESP-32 Co-processor has BLE, so adding a configuration app connectivity is plausable when CircuitPython BLE support enables that function.
+* The Adafruit AirLift ESP-32 Co-processor has BLE, so adding a configuration app connectivity is plausible when CircuitPython BLE support enables that function.
