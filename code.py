@@ -38,7 +38,6 @@ MATRIX_DEBUG = False
 Use these setting to simulate AIO responses locally debug the display look and feel
 """
 sim = simdata.sim()
-gappt_data = sim.get_sim_data(meet_stat="Canceled", subject="mee too", resp_stat="Accepted", ttime="alert")
 USE_SIM_DATA = False
 # -------------------------------
 
@@ -47,7 +46,7 @@ USE_SIM_DATA = False
 # icon bitmap
 # https://icon-library.net/icon/icon-pixels-6.html
 # in GIMP export to BMP after chaning Image mode to Indexed and Generate Optimum pallet
-# choose advanced options and "16 bits A1 R5 G5 B5"
+# choose advanced options and "16 bits R5 G5 B5"
 '''
 Response Status	    Description
 -----------------------------------------------------------------
@@ -62,7 +61,7 @@ status_msg = {
                     "Accepted": {       "icon": "images/check.bmp",         "color": 0x2f7727, "text" : "Accepted"},
                     "Canceled": {       "icon": "images/X.bmp",             "color": 0xFF4b2c, "text" : "Canceled"},
                     "None": {           "icon": "images/NR.bmp",            "color": 0x444444, "text" : ""},
-                    "Not Responded": {  "icon": "images/no-resp.bmp",       "color": 0x888888, "text" : "NR"},
+                    "Not Responded": {  "icon": "images/no-resp.bmp",       "color": 0x888888, "text" : "Not Resp"},
                     "Organizer": {      "icon": "images/exclaimation.bmp",  "color": 0xFCFC3F, "text" : "Organizer"},
                     "Tentative": {      "icon": "images/question_mark.bmp",      "color": 0x273077, "text" : "Tentative"},
                     "No meeting": {     "icon": "",                         "color": 0x000000, "text" : ""}
@@ -147,7 +146,6 @@ def get_count_down(start: str, resp_status: str) -> tuple(str, int):
 def main():
     # because this get changed for simulated data, declare it as global
     global POLL_SECS
-    global gappt_data
 
     # --- Set up the text areas ---
     # Create a new textbox 0 for scrolling the Subject
@@ -215,11 +213,10 @@ def main():
     while True:
         # for testing
         if USE_SIM_DATA:
-            print("Simulating data")
+            if DEBUG:
+                print("Simulating data")
             POLL_SECS = 5 # shorten the poll time to make the test go quicker
-            appt_data = gappt_data
-#            appt_data = sim.get_sim_data(meet_stat="Canceled", subject="mee too", resp_stat="Accepted", ttime="alert")
-            print("simulated app data: ", appt_data)
+            appt_data = sim.get_sim_data(meet_stat=None, subject='Me too!!!', resp_stat=None, ttime=None)
 
         # Typical path to get the latet appointment from AIO
         else:
