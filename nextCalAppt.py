@@ -123,11 +123,11 @@ def get_outlook_appts(begin: datetime, end: datetime) -> Tuple[str, int, str, st
         meeting_status = cal_items[0]["meeting_status"]
         duration = cal_items[0]["duration"]
     else:  # handle nothing in Outlook to return at this point
-        subject = "None"
-        start = ""
-        response_status = ""
+        subject = ""
+        start = int(time.mktime(time.localtime())) # need a valid time
+        response_status = "No meeting"
         meeting_status = ""
-        duration = None
+        duration = 0
 
     return subject, start, response_status, meeting_status, duration
 
