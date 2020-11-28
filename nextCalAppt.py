@@ -18,7 +18,6 @@ import datetime as dt
 
 MINUTES_BACK = 5
 DAYS_AHEAD = 2
-POLL_SECS = 60
 
 UPLOAD = True  # prevent AIO posts during debugging
 MULTIPLE_APPTS_STR = "*** Multiple ***"
@@ -124,7 +123,15 @@ def get_outlook_appts(begin: datetime, end: datetime) -> Tuple[str, int, str, st
         duration = cal_items[0]["duration"]
     else:  # handle nothing in Outlook to return at this point
         subject = ""
-        start = int(time.mktime(time.localtime())) # need a valid time
+        # make up a valid time but with a value that won't be sent to AIO every time
+        no_meeting_time = time.localtime()
+        start = int(time.mktime((no_meeting_time.tm_year,
+                                no_meeting_time.tm_mon,
+                                no_meeting_time.tm_mday,
+                                0,0,0,
+                                no_meeting_time.tm_wday,
+                                no_meeting_time.tm_yday,
+                                no_meeting_time.tm_isdst)))
         response_status = "No meeting"
         meeting_status = ""
         duration = 0
@@ -226,7 +233,4 @@ def main():
 
 
 if __name__ == "__main__":
-    logging.info("starting up...")
-    while True:
-        main()
-        time.sleep(POLL_SECS)
+    main()
