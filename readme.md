@@ -33,9 +33,10 @@ This script pulls a filtered view of appointments from Outlook, looks to see if 
 | subject        | str  | The Subject or title of the meeting     |
 | responseStatus | str  | Response Status                         |
 | meeting_status | str  | Meeting status                          |
+| duration       | int  | duration of the meeting in minutes      |
 
 Example:
-`{"start": 1605542400, "subject": "Just another meeting", "responseStatus": "Organizer", "meeting_status": "Received"}`
+`{"start": 1605542400, "subject": "Just another meeting", "responseStatus": "Organizer", "meeting_status": "Received", "duration": 30}`
 
 
 Another client script would just need to follow this interface format for the Matrix Portal script to function.
