@@ -146,12 +146,12 @@ def get_count_down(start: str, resp_status: str) -> tuple(str, int):
             status_string = "> 1 day away"
 
         if DEBUG:
-            print(f"{my_local_time()} start: {int(start)}")
+            print(f"{my_local_time()} start: {int(start)} local time: {time.mktime(time.localtime())} count_down_val: {count_down_val}")
             # print("start formatted:", time.localtime(start))
             # print("{lhrs:0>2}:{lmin:0>2}".format(lhrs=time.localtime(
             #     start).tm_hour, lmin=time.localtime(start).tm_min))
-            print(f"{my_local_time()} local time: {time.mktime(time.localtime())}")
-            print(f"{my_local_time()} count_down_val: {count_down_val}")
+            # print(f"{my_local_time()} local time: {time.mktime(time.localtime())}")
+            # print(f"{my_local_time()} count_down_val: {count_down_val}")
 
     return status_string, cd_status
 
