@@ -232,7 +232,8 @@ def main():
             if DEBUG:
                 print("Simulating data")
             POLL_SECS = 5 # shorten the poll time to make the test go quicker
-            appt_data = sim.get_sim_data(meet_stat="None", subject='Me too!!!', resp_stat='Not Responded', ttime=None)
+            # appt_data = sim.get_sim_data(meet_stat="None", subject='Me too!!!', resp_stat='Not Responded', ttime=None)
+            appt_data = sim.get_sim_data()
 
         # Typical path to get the latet appointment from AIO
         else:
