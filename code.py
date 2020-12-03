@@ -20,6 +20,13 @@ import neopixel
 
 import gc
 
+# Some critical but private settings are in the secrets.py file
+try:
+    from secrets import secrets
+except ImportError:
+    print('WiFi secrets are kept in secrets.py, please add them there!')
+    raise
+
 # --- Configuration Settings ---
 # repoll time in seconds
 POLL_SECS = 60
@@ -71,7 +78,37 @@ status_msg = {
 
 # --- Display setup ---
 matrixportal = MatrixPortal(
-    bit_depth=6, status_neopixel=board.NEOPIXEL, debug=MATRIX_DEBUG)
+    bit_depth=5, status_neopixel=board.NEOPIXEL, debug=MATRIX_DEBUG)
+
+# --- Set up the text areas ---
+# Create a new textbox 0 for scrolling the Subject
+matrixportal.add_text(
+    text_font=terminalio.FONT,
+    text_color=0x9b67fc,
+    text_position=(0, 3),
+    scrolling=True,
+)
+
+# Create a new textbox 1 time
+matrixportal.add_text(
+    text_font="fonts/Minecraftia-Regular-8.bdf",
+    text_color=0x262022,
+    text_position=(0, 21)
+)
+
+# Create a new textbox 2 response status
+matrixportal.add_text(
+    text_font="fonts/Minecraftia-Regular-8.bdf",
+    # text_font=terminalio.FONT,
+    text_position=(12, 31)
+)
+
+# Create a new textbox 3 for non-scrolling Subject
+matrixportal.add_text(
+    text_font=terminalio.FONT,
+    text_color=0x9b67fc,
+    text_position=(0, 3)
+)
 
 def my_local_time(pad=0) -> str:
     # now that we connected to the network to get the time,
@@ -147,11 +184,6 @@ def get_count_down(start: str, resp_status: str) -> tuple(str, int):
 
         if DEBUG:
             print(f"{my_local_time()} start: {int(start)} local time: {time.mktime(time.localtime())} count_down_val: {count_down_val}")
-            # print("start formatted:", time.localtime(start))
-            # print("{lhrs:0>2}:{lmin:0>2}".format(lhrs=time.localtime(
-            #     start).tm_hour, lmin=time.localtime(start).tm_min))
-            # print(f"{my_local_time()} local time: {time.mktime(time.localtime())}")
-            # print(f"{my_local_time()} count_down_val: {count_down_val}")
 
     return status_string, cd_status
 
@@ -160,43 +192,6 @@ def main():
     # because this get changed for simulated data, declare it as global
     global POLL_SECS
 
-    # --- Set up the text areas ---
-    # Create a new textbox 0 for scrolling the Subject
-    matrixportal.add_text(
-        text_font=terminalio.FONT,
-        text_color=0x9b67fc,
-        text_position=(0, 3),
-        scrolling=True,
-    )
-
-    # Create a new textbox 1 time
-    matrixportal.add_text(
-        text_font="fonts/Minecraftia-Regular-8.bdf",
-        text_color=0x262022,
-        text_position=(0, 21)
-    )
-
-    # Create a new textbox 2 response status
-    matrixportal.add_text(
-        text_font="fonts/Minecraftia-Regular-8.bdf",
-        # text_font=terminalio.FONT,
-        text_position=(12, 31)
-    )
-
-    # Create a new textbox 3 for non-scrolling Subject
-    matrixportal.add_text(
-        text_font=terminalio.FONT,
-        text_color=0x9b67fc,
-        text_position=(0, 3)
-    )
-
-    # Some critical but private settings are in the secrets.py file
-    try:
-        from secrets import secrets
-    except ImportError:
-        print('WiFi secrets are kept in secrets.py, please add them there!')
-        raise
-    # matrixportal.set_background("images/gradient.bmp", [0, 0])
     matrixportal.set_text("Setting time...", 1)
 
     # try doing an AIO call before getting time and avoid bug
@@ -213,11 +208,6 @@ def main():
     # now that we connected to the network to get the time,
     # we can display the local time
     curr_time = my_local_time(6)
-    # curr_time_struct = time.localtime()
-    # curr_time = "      {lhrs:0>2}:{lmin:0>2}:{lsec:0>2}".format(
-    #             lhrs=curr_time_struct.tm_hour,
-    #             lmin=curr_time_struct.tm_min,
-    #             lsec=curr_time_struct.tm_sec)
     matrixportal.set_text_color(0x6666FF, 1)
 
     matrixportal.set_text(curr_time, 1)
@@ -230,7 +220,9 @@ def main():
         # for testing
         if USE_SIM_DATA:
             if DEBUG:
-                print("Simulating data")
+                before_mem = gc.mem_free()
+                gc.collect()
+                print(f"Simulating data, Available Heap before: {before_mem} after: {gc.mem_free()}")
             POLL_SECS = 5 # shorten the poll time to make the test go quicker
             # appt_data = sim.get_sim_data(meet_stat="None", subject='Me too!!!', resp_stat='Not Responded', ttime=None)
             appt_data = sim.get_sim_data()
@@ -242,12 +234,16 @@ def main():
                 before = time.monotonic()
                 ol_event_feed = matrixportal.get_io_data(secrets['aio_feed'])
                 if DEBUG:
-                    print(f'Available Heap: {gc.mem_free()}')
+                    print(f'{my_local_time()} Available Heap: {gc.mem_free()}')
                     print(f"{my_local_time()} AIO get_io_data response time: {time.monotonic() - before}")
             except AdafruitIO_RequestError:
                 matrixportal.set_text_color(0xFF0000, 1)
                 matrixportal.set_text('Feed error', 1)
                 time.sleep(30)
+                continue
+            except ValueError:
+                if DEBUG:
+                    print(f'{my_local_time()} ValueError: syntax error in JSON')
                 continue
 
             # handle no data on AIO
@@ -268,7 +264,6 @@ def main():
                     print(f'{my_local_time()} first_item[value]: {first_item["value"]}')
 
                 first_value = first_item["value"]
-                # appt_data = json.loads(first_value.replace("'", '"'))
                 appt_data = json.loads(first_value)
 
                 if DEBUG:
@@ -276,6 +271,10 @@ def main():
                     print(f'appt_data["subject"]: {appt_data["subject"]}')
                     print(f'appt_data["start"]: {appt_data["start"]}')
 
+        # if DEBUG:
+        #     before_mem = gc.mem_free()
+        #     gc.collect()
+        #     print(f"{my_local_time()} Available Heap before: {before_mem} after: {gc.mem_free()}")
         if len(appt_data["subject"]) > SUBJECT_SCROLL_LIMIT:
             matrixportal.set_text(appt_data["subject"].strip(), 0)
             matrixportal.set_text("", 3)
