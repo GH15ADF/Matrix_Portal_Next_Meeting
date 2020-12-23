@@ -30,6 +30,8 @@ except ImportError:
 # --- Configuration Settings ---
 # repoll time in seconds
 POLL_SECS = 60
+# time resync every hour to limit clock drift
+TIME_RESYNC = 60 
 
 # How many characters in the appointment subject before needing to scroll the text
 SUBJECT_SCROLL_LIMIT = 10
@@ -37,10 +39,17 @@ SUBJECT_SCROLL_LIMIT = 10
 # set the scroll text delay. More than 0.4 looks jerkie to me
 SCROLL_DELAY = 0.04
 
-# Display debug messages
+# Display debug messages --------
 DEBUG = True
 MATRIX_DEBUG = True
 # -------------------------------
+
+# fetch info --------------------
+_HEADER = {"X-AIO-Key": secrets['aio_key']}
+_PATH = ['value']
+_RECENT_DATA_URL = "https://io.adafruit.com/api/v2/" + \
+    secrets['aio_username'] + "/feeds/appts/data/last"
+# --------------------------------
 
 # --- Simulation data ---
 """
@@ -50,67 +59,11 @@ sim = simdata.sim()
 USE_SIM_DATA = False
 # -------------------------------
 
-# setup for Response status
-
-# icon bitmap
-# https://icon-library.net/icon/icon-pixels-6.html
-# in GIMP export to BMP after chaning Image mode to Indexed and Generate Optimum pallet
-# choose advanced options and "16 bits R5 G5 B5"
-'''
-Response Status	    Description
------------------------------------------------------------------
-Accepted	        Sombody elses meeting you have accepted
-Canceled            Sombody elses meeting but is now canceled
-None        	    Your meeting but no attendees
-Not Responded	    Sombody elses meeting and you have not responded
-Organizer   	    Your meeting with attendees
-Tentative    	    Sombody elses meeting you  accepted as tentative
-'''
-status_msg = {
-                    "Accepted": {       "icon": "images/check.bmp",         "color": 0x2f7727, "text" : "Accepted"},
-                    "Canceled": {       "icon": "images/X.bmp",             "color": 0xFF4b2c, "text" : "Canceled"},
-                    "None": {           "icon": "images/NR.bmp",            "color": 0x444444, "text" : ""},
-                    "Not Responded": {  "icon": "images/no-resp.bmp",       "color": 0x888888, "text" : "Not Resp"},
-                    "Organizer": {      "icon": "images/exclaimation.bmp",  "color": 0xFCFC3F, "text" : "Organizer"},
-                    "Tentative": {      "icon": "images/question_mark.bmp",      "color": 0x273077, "text" : "Tentative"},
-                    "No meeting": {     "icon": "",                         "color": 0x000000, "text" : ""}
-                }
-
-# --- Display setup ---
-matrixportal = MatrixPortal(
-    bit_depth=5, status_neopixel=board.NEOPIXEL, debug=MATRIX_DEBUG)
-
-# --- Set up the text areas ---
-# Create a new textbox 0 for scrolling the Subject
-matrixportal.add_text(
-    text_font=terminalio.FONT,
-    text_color=0x9b67fc,
-    text_position=(0, 3),
-    scrolling=True,
-)
-
-# Create a new textbox 1 time
-matrixportal.add_text(
-    text_font="fonts/Minecraftia-Regular-8.bdf",
-    text_color=0x262022,
-    text_position=(0, 21)
-)
-
-# Create a new textbox 2 response status
-matrixportal.add_text(
-    text_font="fonts/Minecraftia-Regular-8.bdf",
-    # text_font=terminalio.FONT,
-    text_position=(12, 31)
-)
-
-# Create a new textbox 3 for non-scrolling Subject
-matrixportal.add_text(
-    text_font=terminalio.FONT,
-    text_color=0x9b67fc,
-    text_position=(0, 3)
-)
 
 def my_local_time(pad=0) -> str:
+    """Returns the local time as a string formatted HH:MM:SS
+    :param int pad: the number of spaced characters to prepend to the string to position on the RGB LED display. Default is 0 
+    """
     # now that we connected to the network to get the time,
     # we can display the local time
     curr_time_struct = time.localtime()
@@ -188,127 +141,200 @@ def get_count_down(start: str, resp_status: str) -> tuple(str, int):
     return status_string, cd_status
 
 
+# icon bitmap
+# https://icon-library.net/icon/icon-pixels-6.html
+# in GIMP export to BMP after chaning Image mode to Indexed and Generate Optimum pallet
+# choose advanced options and "16 bits R5 G5 B5"
+'''
+Response Status	    Description
+-----------------------------------------------------------------
+Accepted	        Sombody elses meeting you have accepted
+Canceled            Sombody elses meeting but is now canceled
+None        	    Your meeting but no attendees
+Not Responded	    Sombody elses meeting and you have not responded
+Organizer   	    Your meeting with attendees
+Tentative    	    Sombody elses meeting you  accepted as tentative
+'''
+status_msg = {
+                    "Accepted": {"icon": "images/check.bmp",         "color": 0x2f7727, "text": "Accepted"},
+                    "Canceled": {"icon": "images/X.bmp",             "color": 0xFF4b2c, "text": "Canceled"},
+                    "None": {"icon": "images/NR.bmp",            "color": 0x444444, "text": ""},
+                    "Not Responded": {"icon": "images/no-resp.bmp",       "color": 0x888888, "text": "Not Resp"},
+                    "Organizer": {"icon": "images/exclaimation.bmp",  "color": 0xFCFC3F, "text": "Organizer"},
+                    "Tentative": {"icon": "images/question_mark.bmp",      "color": 0x273077, "text": "Tentative"},
+                    "No meeting": {"icon": "",                         "color": 0x000000, "text": ""}
+                }
+
+# --- Display setup ---
+matrixportal = MatrixPortal(
+    bit_depth=5, status_neopixel=board.NEOPIXEL, debug=MATRIX_DEBUG)
+
+# --- Set up the text areas ---
+# Create a new textbox 0 for scrolling the Subject
+matrixportal.add_text(
+    text_font=terminalio.FONT,
+    text_color=0x9b67fc,
+    text_position=(0, 3),
+    scrolling=True,
+)
+
+# Create a new textbox 1 time
+matrixportal.add_text(
+    text_font="fonts/Minecraftia-Regular-8.bdf",
+    text_color=0x262022,
+    text_position=(0, 21)
+)
+
+# Create a new textbox 2 response status
+matrixportal.add_text(
+    text_font="fonts/Minecraftia-Regular-8.bdf",
+    # text_font=terminalio.FONT,
+    text_position=(12, 31)
+)
+
+# Create a new textbox 3 for non-scrolling Subject
+matrixportal.add_text(
+    text_font=terminalio.FONT,
+    text_color=0x9b67fc,
+    text_position=(0, 3)
+)
+matrixportal.set_text("Setting time...", 1)
+
+# try doing an AIO call before getting time and avoid bug
+# https://github.com/adafruit/Adafruit_CircuitPython_MatrixPortal/issues/51
+before_time = time.monotonic()
+matrixportal.get_io_feed(secrets['aio_feed'])
+if DEBUG:
+    print(f'AIO get_io_feed response time: {time.monotonic() - before_time}')
+
+# Need to set the clock to local time
+before_time = time.monotonic()
+matrixportal.get_local_time(location=secrets['timezone'])
+# set variable to manage time resync period
+last_time_sync = time.monotonic()
+
+# now that we connected to the network to get the time,
+# we can display the local time
+curr_time = my_local_time(6)
+matrixportal.set_text_color(0x6666FF, 1)
+
+matrixportal.set_text(curr_time, 1)
+
+if DEBUG:
+    print(f'AIO get_local_time response time: {time.monotonic() - before_time}')
+    print(f'time.localtime: {curr_time}')
+
+
 def main():
     # because this get changed for simulated data, declare it as global
     global POLL_SECS
 
-    matrixportal.set_text("Setting time...", 1)
+    # for testing
+    if USE_SIM_DATA:
+        if DEBUG:
+            before_mem = gc.mem_free()
+            gc.collect()
+            print(
+                f"Simulating data, Available Heap before: {before_mem} after: {gc.mem_free()}")
+        POLL_SECS = 5  # shorten the poll time to make the test go quicker
+        # appt_data = sim.get_sim_data(meet_stat="None", subject='Me too!!!', resp_stat='Not Responded', ttime=None)
+        appt_data = sim.get_sim_data()
 
-    # try doing an AIO call before getting time and avoid bug
-    # https://github.com/adafruit/Adafruit_CircuitPython_MatrixPortal/issues/51
-    before = time.monotonic()
-    matrixportal.get_io_feed(secrets['aio_feed'])
-    if DEBUG:
-        print(f'AIO get_io_feed response time: {time.monotonic() - before}')
-
-    # Need to set the clock to local time
-    before = time.monotonic()
-    matrixportal.get_local_time(location=secrets['timezone'])
-
-    # now that we connected to the network to get the time,
-    # we can display the local time
-    curr_time = my_local_time(6)
-    matrixportal.set_text_color(0x6666FF, 1)
-
-    matrixportal.set_text(curr_time, 1)
-    if DEBUG:
-        print(f'AIO get_local_time response time: {time.monotonic() - before}')
-        print(f'time.localtime: {curr_time}')
-
-    # main look that runs forever
-    while True:
-        # for testing
-        if USE_SIM_DATA:
+    # Typical path to get the latet appointment from AIO
+    else:
+        # check to see if the feed exists
+        try:
+            before_time = time.monotonic()
             if DEBUG:
-                before_mem = gc.mem_free()
-                gc.collect()
-                print(f"Simulating data, Available Heap before: {before_mem} after: {gc.mem_free()}")
-            POLL_SECS = 5 # shorten the poll time to make the test go quicker
-            # appt_data = sim.get_sim_data(meet_stat="None", subject='Me too!!!', resp_stat='Not Responded', ttime=None)
-            appt_data = sim.get_sim_data()
+                print(f'{my_local_time()} right before get_io_data()')
+            ol_event_feed = matrixportal.get_io_data(secrets['aio_feed'])
+            # ol_event_feed = matrixportal.network.fetch_data(
+                # _RECENT_DATA_URL, headers=_HEADER, json_path=(_PATH,))
+            if DEBUG:
+                print(f'{my_local_time()} Available Heap: {gc.mem_free()}')
+                print(
+                    f"{my_local_time()} AIO get_io_data response time: {time.monotonic() - before_time}")
+        except AdafruitIO_RequestError:
+            matrixportal.set_text_color(0xFF0000, 1)
+            matrixportal.set_text('Feed error', 1)
+            time.sleep(30)
+            # continue
+        except ValueError as e:
+            if DEBUG:
+                print(f'{my_local_time()} ValueError: {e}')
+            # continue
+        except RuntimeError as e:
+            if DEBUG:
+                print(f'{my_local_time()} RuntimeError: {e}')
+            # continue				
+        # handle no data on AIO
+        if len(ol_event_feed) == 0:
+            # set all appt_data fields for nothing to display
+            if DEBUG:
+                print(f"{my_local_time()} No meetings to display")
+            appt_data = {}
+            appt_data["subject"] = ""
+            appt_data["responseStatus"] = "No meeting"
+            appt_data["meeting_status"] = ""
+            # make up a start time
+            appt_data["start"] = time.mktime(time.localtime())
 
-        # Typical path to get the latet appointment from AIO
         else:
-            # check to see if the feed exists
-            try:
-                before = time.monotonic()
-                ol_event_feed = matrixportal.get_io_data(secrets['aio_feed'])
-                if DEBUG:
-                    print(f'{my_local_time()} Available Heap: {gc.mem_free()}')
-                    print(f"{my_local_time()} AIO get_io_data response time: {time.monotonic() - before}")
-            except AdafruitIO_RequestError:
-                matrixportal.set_text_color(0xFF0000, 1)
-                matrixportal.set_text('Feed error', 1)
-                time.sleep(30)
-                continue
-            except ValueError:
-                if DEBUG:
-                    print(f'{my_local_time()} ValueError: syntax error in JSON')
-                continue
+            # use this with get_io_data()
+            appt_data = json.loads(ol_event_feed[0]["value"])
+            # use this with network.fetch_data()
+            # appt_data = json.loads(ol_event_feed[0])
 
-            # handle no data on AIO
-            if len(ol_event_feed) == 0:
-                # set all appt_data fields for nothing to display
-                if DEBUG:
-                    print(f"{my_local_time()} No meetings to display")
-                appt_data = {}
-                appt_data["subject"] = ""
-                appt_data["responseStatus"] = "No meeting"
-                appt_data["meeting_status"] = ""
-                # make up a start time
-                appt_data["start"] = time.mktime(time.localtime())
+            if DEBUG:
+                print(f"appt_data: {appt_data}")
+                print(f'appt_data["subject"]: {appt_data["subject"]}')
+                print(f'appt_data["start"]: {appt_data["start"]}')
 
-            else:
-                first_item = ol_event_feed[0]
-                if DEBUG:
-                    print(f'{my_local_time()} first_item[value]: {first_item["value"]}')
+    # if DEBUG:
+    #     before_mem = gc.mem_free()
+    #     gc.collect()
+    #     print(f"{my_local_time()} Available Heap before: {before_mem} after: {gc.mem_free()}")
+    if len(appt_data["subject"]) > SUBJECT_SCROLL_LIMIT:
+        matrixportal.set_text(appt_data["subject"].strip(), 0)
+        matrixportal.set_text("", 3)
+    else:
+        matrixportal.set_text(appt_data["subject"].strip(), 3)
+        matrixportal.set_text(" ", 0)
 
-                first_value = first_item["value"]
-                appt_data = json.loads(first_value)
+    # Set Response status text and icon
+    status_display = compute_status(appt_data["responseStatus"],appt_data["meeting_status"])
+    print(f"{my_local_time()} status_display: {status_display}")
+    matrixportal.set_text(status_msg[status_display]["text"], 2)
+    matrixportal.set_text_color(
+        status_msg[status_display]["color"], 2)
+    matrixportal.set_background(
+        status_msg[status_display]["icon"], [0, 21])
 
-                if DEBUG:
-                    print(f"appt_data: {appt_data}")
-                    print(f'appt_data["subject"]: {appt_data["subject"]}')
-                    print(f'appt_data["start"]: {appt_data["start"]}')
-
-        # if DEBUG:
-        #     before_mem = gc.mem_free()
-        #     gc.collect()
-        #     print(f"{my_local_time()} Available Heap before: {before_mem} after: {gc.mem_free()}")
-        if len(appt_data["subject"]) > SUBJECT_SCROLL_LIMIT:
-            matrixportal.set_text(appt_data["subject"].strip(), 0)
-            matrixportal.set_text("", 3)
-        else:
-            matrixportal.set_text(appt_data["subject"].strip(), 3)
-            matrixportal.set_text(" ", 0)
-
-        # Set Response status text and icon
-        status_display = compute_status(appt_data["responseStatus"],appt_data["meeting_status"])
-        print(f"{my_local_time()} status_display: {status_display}")
-        matrixportal.set_text(status_msg[status_display]["text"], 2)
-        matrixportal.set_text_color(
-            status_msg[status_display]["color"], 2)
-        matrixportal.set_background(
-            status_msg[status_display]["icon"], [0, 21])
-
-        # to set up for the re-poll time, get the last update time
-        last = time.time()
-        # Need to loop to allow the scrolling text to be continuously displayed
-        # Loop until the re-poll time is over
-        while time.time() - last < POLL_SECS:
-            # calculate the time row contents
-            count_down_str, count_down_stat_color = get_count_down(
-                appt_data["start"], appt_data["responseStatus"])
-            matrixportal.set_text_color(count_down_stat_color, 1)
-            matrixportal.set_text(count_down_str, 1)
-            # scroll the text
-            matrixportal.scroll_text(SCROLL_DELAY)
-            # do a little pause before repeating the scroll
-            time.sleep(1)
+    # to set up for the re-poll time, get the last update time
+    last = time.time()
+    # Need to loop to allow the scrolling text to be continuously displayed
+    # Loop until the re-poll time is over
+    while time.time() - last < POLL_SECS:
+        # calculate the time row contents
+        count_down_str, count_down_stat_color = get_count_down(
+            appt_data["start"], appt_data["responseStatus"])
+        matrixportal.set_text_color(count_down_stat_color, 1)
+        matrixportal.set_text(count_down_str, 1)
+        # scroll the text
+        matrixportal.scroll_text(SCROLL_DELAY)
+    
+    gc.collect()
+    if DEBUG:
+        print(f'{my_local_time()} Available Heap: {gc.mem_free()}')
 
 
 if __name__ == "__main__":
     while True:
+        # check for time resync. The MatrixPortal clock seems to drift enough over long 
+        # periods that the meeting count down display is misleading
+        if (time.monotonic() - last_time_sync > TIME_RESYNC):
+            last_time_sync = time.monotonic()
+            matrixportal.get_local_time(location=secrets['timezone'])
+            if DEBUG:
+                print(f'Time resync: {my_local_time()}')
         main()
-        time.sleep(POLL_SECS)
-        gc.collect()
