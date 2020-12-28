@@ -14,10 +14,10 @@ import time
 import gc
 
 # Display imports
-import adafruit_display_text.label
+# import adafruit_display_text.label
 import terminalio
 from adafruit_io.adafruit_io import AdafruitIO_RequestError
-import neopixel
+# import neopixel
 
 # Some critical but private settings are in the secrets.py file
 try:
@@ -167,7 +167,8 @@ status_msg = {
 
 # --- Display setup ---
 matrixportal = MatrixPortal(
-    bit_depth=5, status_neopixel=board.NEOPIXEL, debug=MATRIX_DEBUG)
+    bit_depth=4, status_neopixel=board.NEOPIXEL, debug=MATRIX_DEBUG)
+
 
 # --- Set up the text areas ---
 # Create a new textbox 0 for scrolling the Subject
@@ -198,18 +199,31 @@ matrixportal.add_text(
     text_color=0x9b67fc,
     text_position=(0, 3)
 )
+
+glyphs = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-!,. \"'?!>:"
+matrixportal.preload_font(glyphs, index=0)
+matrixportal.preload_font(glyphs, index=1)
+
 matrixportal.set_text('Setting time...', 1)
 
 # try doing an AIO call before getting time and avoid bug
 # https://github.com/adafruit/Adafruit_CircuitPython_MatrixPortal/issues/51
 before_time = time.monotonic()
-matrixportal.get_io_feed(secrets['aio_feed'])
+try:
+    matrixportal.get_io_feed(secrets['aio_feed'])
+except RuntimeError as e:
+    if DEBUG:
+        print(f'{my_local_time()} RuntimeError: {e}')
 if DEBUG:
     print(f'AIO get_io_feed response time: {time.monotonic() - before_time}')
 
 # Need to set the clock to local time
 before_time = time.monotonic()
-matrixportal.get_local_time(location=secrets['timezone'])
+try:
+    matrixportal.get_local_time(location=secrets['timezone'])
+except RuntimeError as e:
+    if DEBUG:
+        print(f'{my_local_time()} RuntimeError: {e}')
 # set variable to manage time resync period
 last_time_sync = time.monotonic()
 
@@ -247,9 +261,14 @@ def main():
             before_time = time.monotonic()
             if DEBUG:
                 print(f'{my_local_time()} right before get_io_data()')
-            ol_event_feed = matrixportal.get_io_data(secrets['aio_feed'])
-            # ol_event_feed = matrixportal.network.fetch_data(
-                # _RECENT_DATA_URL, headers=_HEADER, json_path=(_PATH,))
+            try:
+                ol_event_feed = matrixportal.get_io_data(secrets['aio_feed'])
+                # you can also use fetch_data()
+                # ol_event_feed = matrixportal.network.fetch_data(
+                    # _RECENT_DATA_URL, headers=_HEADER, json_path=(_PATH,))
+            except RuntimeError as e:
+                if DEBUG:
+                    print(f'{my_local_time()} RuntimeError: {e}')
             if DEBUG:
                 print(f'{my_local_time()} Available Heap: {gc.mem_free()}')
                 print(
@@ -309,6 +328,7 @@ def main():
         status_msg[status_display]['color'], 2)
     matrixportal.set_background(
         status_msg[status_display]['icon'], [0, 21])
+    
 
     # to set up for the re-poll time, get the last update time
     last = time.time()
@@ -334,7 +354,9 @@ if __name__ == '__main__':
         # periods that the meeting count down display is misleading
         if (time.monotonic() - last_time_sync > TIME_RESYNC):
             last_time_sync = time.monotonic()
-            matrixportal.get_local_time(location=secrets['timezone'])
-            if DEBUG:
-                print(f'Time resync: {my_local_time()}')
+            try:
+                matrixportal.get_local_time(location=secrets['timezone'])
+            except RuntimeError as e:
+                if DEBUG:
+                    print(f'{my_local_time()} RuntimeError: {e}')
         main()
