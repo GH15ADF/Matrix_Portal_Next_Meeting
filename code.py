@@ -200,10 +200,6 @@ matrixportal.add_text(
     text_position=(0, 3)
 )
 
-glyphs = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-!,. \"'?!>:"
-matrixportal.preload_font(glyphs, index=0)
-matrixportal.preload_font(glyphs, index=1)
-
 matrixportal.set_text('Setting time...', 1)
 
 # try doing an AIO call before getting time and avoid bug
@@ -315,7 +311,7 @@ def main():
     #     print(f'{my_local_time()} Available Heap before: {before_mem} after: {gc.mem_free()}')
     if len(appt_data['subject']) > SUBJECT_SCROLL_LIMIT:
         matrixportal.set_text(appt_data['subject'].strip(), 0)
-        matrixportal.set_text('', 3)
+        matrixportal.set_text(' ', 3)
     else:
         matrixportal.set_text(appt_data['subject'].strip(), 3)
         matrixportal.set_text(' ', 0)
