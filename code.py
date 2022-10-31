@@ -14,10 +14,8 @@ import time
 import gc
 
 # Display imports
-# import adafruit_display_text.label
 import terminalio
 from adafruit_io.adafruit_io import AdafruitIO_RequestError
-# import neopixel
 
 # Some critical but private settings are in the secrets.py file
 try:
@@ -30,10 +28,12 @@ except ImportError:
 # repoll time in seconds
 POLL_SECS = 60
 # time resync every hour to limit clock drift
-TIME_RESYNC = 60 
+TIME_RESYNC = 300 
 
 # How many characters in the appointment subject before needing to scroll the text
 SUBJECT_SCROLL_LIMIT = 10
+# To limit extremely long subjects, set the number of scroll panels are allowed
+SCROLL_MULTIPLIER = 3
 
 # set the scroll text delay. More than 0.4 looks jerkie to me
 SCROLL_DELAY = 0.04
@@ -83,6 +83,8 @@ def compute_status(resp_status: str, meeting_status: str) -> str:
     # if the meeting status is canceled, ignore the response status
     if meeting_status.lower().find('canceled') > -1:
         return('Canceled')
+    # elif resp_status == 'None':
+    #     return('XXXX')
     else:
         return(resp_status)
 
@@ -158,11 +160,11 @@ Tentative    	    Sombody elses meeting you  accepted as tentative
 status_msg = {
                     'Accepted': {'icon': 'images/check.bmp',         'color': 0x2f7727, 'text': 'Accepted'},
                     'Canceled': {'icon': 'images/X.bmp',             'color': 0xFF4b2c, 'text': 'Canceled'},
-                    'None': {'icon': 'images/NR.bmp',            'color': 0x444444, 'text': ''},
+                    'None': {'icon': 'images/NR.bmp',            'color': 0x444444, 'text': ' '},
                     'Not Responded': {'icon': 'images/no-resp.bmp',       'color': 0x888888, 'text': 'Not Resp'},
                     'Organizer': {'icon': 'images/exclaimation.bmp',  'color': 0xFCFC3F, 'text': 'Organizer'},
                     'Tentative': {'icon': 'images/question_mark.bmp',      'color': 0x273077, 'text': 'Tentative'},
-                    'No meeting': {'icon': '',                         'color': 0x000000, 'text': ''}
+                    'No meeting': {'icon': '',                         'color': 0x000000, 'text': ' '} # got to have some value for status
                 }
 
 # --- Display setup ---
@@ -175,30 +177,36 @@ matrixportal = MatrixPortal(
 matrixportal.add_text(
     text_font=terminalio.FONT,
     text_color=0x9b67fc,
-    text_position=(0, 3),
+    text_position=(0, 4),
     scrolling=True,
 )
+matrixportal.set_text(' ', 0)
 
 # Create a new textbox 1 time
 matrixportal.add_text(
-    text_font='fonts/Minecraftia-Regular-8.bdf',
+    text_font='fonts/Minecraftia-Regular-8-mod.bdf',
     text_color=0x262022,
-    text_position=(0, 21)
+    text_position=(0, 16)
 )
+matrixportal.set_text(' ', 1)
+
 
 # Create a new textbox 2 response status
 matrixportal.add_text(
-    text_font='fonts/Minecraftia-Regular-8.bdf',
-    # text_font=terminalio.FONT,
-    text_position=(12, 31)
+    text_font='fonts/Minecraftia-Regular-8-mod.bdf',
+    text_position=(12, 27),
+    text_color=0x808080
 )
+matrixportal.set_text(' ', 2)
+
 
 # Create a new textbox 3 for non-scrolling Subject
 matrixportal.add_text(
     text_font=terminalio.FONT,
     text_color=0x9b67fc,
-    text_position=(0, 3)
+    text_position=(0, 4)
 )
+matrixportal.set_text(' ', 3)
 
 matrixportal.set_text('Setting time...', 1)
 
@@ -253,64 +261,66 @@ def main():
     # Typical path to get the latet appointment from AIO
     else:
         # check to see if the feed exists
+        before_time = time.monotonic()
+        if DEBUG:
+            print(f'{my_local_time()} right before get_io_data()')
         try:
-            before_time = time.monotonic()
-            if DEBUG:
-                print(f'{my_local_time()} right before get_io_data()')
-            try:
-                ol_event_feed = matrixportal.get_io_data(secrets['aio_feed'])
-                # you can also use fetch_data()
-                # ol_event_feed = matrixportal.network.fetch_data(
-                    # _RECENT_DATA_URL, headers=_HEADER, json_path=(_PATH,))
-            except RuntimeError as e:
-                if DEBUG:
-                    print(f'{my_local_time()} RuntimeError: {e}')
-            if DEBUG:
-                print(f'{my_local_time()} Available Heap: {gc.mem_free()}')
-                print(
-                    f'{my_local_time()} AIO get_io_data response time: {time.monotonic() - before_time}')
+            ol_event_feed = matrixportal.get_io_data(secrets['aio_feed'])
+            # you can also use fetch_data()
+            # ol_event_feed = matrixportal.network.fetch_data(
+            #     _RECENT_DATA_URL, headers=_HEADER, json_path=(_PATH,))
         except AdafruitIO_RequestError:
             matrixportal.set_text_color(0xFF0000, 1)
             matrixportal.set_text('Feed error', 1)
             time.sleep(30)
+        except OutOfRetries:
+            matrixportal.set_text_color(0xFF0000, 1)
+            matrixportal.set_text('OutOfRetries', 1)
+            time.sleep(30)
             # continue
-        except ValueError as e:
+        except Exception as e:
             if DEBUG:
-                print(f'{my_local_time()} ValueError: {e}')
+                print(f'{my_local_time()} Exception: {type(e).__name__} {e}')
             # continue
-        except RuntimeError as e:
+        else: # no exception so there should be an ol_event_feed object
             if DEBUG:
-                print(f'{my_local_time()} RuntimeError: {e}')
-            # continue				
-        # handle no data on AIO
-        if len(ol_event_feed) == 0:
-            # set all appt_data fields for nothing to display
-            if DEBUG:
-                print(f'{my_local_time()} No meetings to display')
-            appt_data = {}
-            appt_data['subject'] = ''
-            appt_data['responseStatus'] = 'No meeting'
-            appt_data['meeting_status'] = ''
-            # make up a start time
-            appt_data['start'] = time.mktime(time.localtime())
+                print(f'{my_local_time()} Available Heap: {gc.mem_free()}')
+                print(
+                    f'{my_local_time()} AIO get_io_data response time: {time.monotonic() - before_time}')
+            # handle no data on AIO
+            if len(ol_event_feed) == 0:
+                # set all appt_data fields for nothing to display
+                if DEBUG:
+                    print(f'{my_local_time()} No meetings to display')
+                appt_data = {}
+                appt_data['subject'] = ''
+                appt_data['responseStatus'] = 'No meeting'
+                appt_data['meeting_status'] = ' '
+                # make up a start time
+                appt_data['start'] = time.mktime(time.localtime())
 
-        else:
-            # use this with get_io_data()
-            appt_data = json.loads(ol_event_feed[0]['value'])
-            # use this with network.fetch_data()
-            # appt_data = json.loads(ol_event_feed[0])
+            else:
+                # use this with get_io_data()
+                appt_data = json.loads(ol_event_feed[0]['value'])
+                # use this with network.fetch_data()
+                # appt_data = json.loads(ol_event_feed[0])
 
-            if DEBUG:
-                print(f'appt_data: {appt_data}')
-                print(f'appt_data["subject"]: {appt_data["subject"]}')
-                print(f'appt_data["start"]: {appt_data["start"]}')
+                if DEBUG:
+                    print(f'appt_data: {appt_data}')
+                    print(f'appt_data["subject"]: {appt_data["subject"]}')
+                    print(f'appt_data["start"]: {appt_data["start"]}')
 
-    # if DEBUG:
-    #     before_mem = gc.mem_free()
-    #     gc.collect()
-    #     print(f'{my_local_time()} Available Heap before: {before_mem} after: {gc.mem_free()}')
+    if DEBUG:
+        before_mem = gc.mem_free()
+        gc.collect()
+        print(f'{my_local_time()} Available Heap before: {before_mem} after: {gc.mem_free()}')
+        foo = appt_data['subject'].strip()
+        before_mem = gc.mem_free()
+        gc.collect()
+        print(f'{my_local_time()} Available Heap before: {before_mem} after strip: {gc.mem_free()}')
+
     if len(appt_data['subject']) > SUBJECT_SCROLL_LIMIT:
-        matrixportal.set_text(appt_data['subject'].strip(), 0)
+        matrixportal.set_text(appt_data['subject'].strip()[:SUBJECT_SCROLL_LIMIT * SCROLL_MULTIPLIER], 0)
         matrixportal.set_text(' ', 3)
     else:
         matrixportal.set_text(appt_data['subject'].strip(), 3)
@@ -352,7 +362,7 @@ if __name__ == '__main__':
             last_time_sync = time.monotonic()
             try:
                 matrixportal.get_local_time(location=secrets['timezone'])
-            except RuntimeError as e:
+            except Exception as e:
                 if DEBUG:
-                    print(f'{my_local_time()} RuntimeError: {e}')
+                    print(f'{my_local_time()} get_local_time exception: {e}')
         main()
